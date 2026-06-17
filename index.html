@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TEN/18 ENTERPRISE // COMMAND CENTER</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+  
+  :root {
+    --green: #00ff88;
+    --green-dim: #004422;
+    --cyan: #00ffff;
+    --gold: #C9A03C;
+    --red: #ff3333;
+    --bg: #030810;
+    --surface: #060f1a;
+    --border: #0a2040;
+    --text: #88bbcc;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline effect */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,136,0.02) 2px, rgba(0,255,136,0.02) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* Corner decorations */
+  .corner { position: fixed; width: 60px; height: 60px; }
+  .corner.tl { top:8px; left:8px; border-top:2px solid var(--gold); border-left:2px solid var(--gold); }
+  .corner.tr { top:8px; right:8px; border-top:2px solid var(--gold); border-right:2px solid var(--gold); }
+  .corner.bl { bottom:8px; left:8px; border-bottom:2px solid var(--gold); border-left:2px solid var(--gold); }
+  .corner.br { bottom:8px; right:8px; border-bottom:2px solid var(--gold); border-right:2px solid var(--gold); }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--green-dim);
+    padding: 16px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display:flex; flex-direction:column; gap:2px; }
+  .header-logo { font-family:'Orbitron',monospace; font-size:22px; font-weight:900; color:var(--gold); letter-spacing:4px; }
+  .header-sub { font-size:11px; color:var(--text); letter-spacing:3px; }
+  .header-center { text-align:center; }
+  .header-title { font-family:'Orbitron',monospace; font-size:14px; color:var(--cyan); letter-spacing:6px; }
+  .header-right { text-align:right; font-size:11px; color:var(--text); }
+  .clock { font-size:18px; color:var(--green); font-family:'Orbitron',monospace; }
+  
+  .status-bar {
+    background: rgba(0,255,136,0.05);
+    border-bottom: 1px solid var(--green-dim);
+    padding: 6px 32px;
+    display: flex; gap: 40px; align-items: center;
+    font-size: 11px; color: var(--text); letter-spacing: 1px;
+  }
+  .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; animation: blink 2s infinite; }
+  .status-dot.green { background:var(--green); }
+  .status-dot.gold { background:var(--gold); }
+  .status-dot.red { background:var(--red); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Main layout */
+  .main { display:grid; grid-template-columns: 340px 1fr; height: calc(100vh - 85px); }
+
+  /* Left panel */
+  .left-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--green-dim);
+    overflow-y: auto;
+    padding: 20px 16px;
+  }
+  .panel-title {
+    font-family:'Orbitron',monospace; font-size:10px; letter-spacing:4px;
+    color:var(--gold); border-bottom:1px solid var(--green-dim); padding-bottom:8px; margin-bottom:16px;
+  }
+
+  /* Station cards */
+  .station-card {
+    background: rgba(0,255,136,0.03);
+    border: 1px solid var(--green-dim);
+    border-left: 3px solid var(--green);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .station-card:hover { background: rgba(0,255,136,0.07); border-color: var(--green); }
+  .station-card.active { border-left-color: var(--gold); background: rgba(201,160,60,0.05); }
+  .station-card.alert { border-left-color: var(--red); animation: pulse-border 1s infinite; }
+  @keyframes pulse-border { 0%,100%{border-left-color:var(--red)} 50%{border-left-color:#880000} }
+
+  .station-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; }
+  .station-codename { font-family:'Orbitron',monospace; font-size:12px; color:var(--cyan); font-weight:700; }
+  .station-status { font-size:9px; letter-spacing:2px; padding:2px 8px; border-radius:2px; }
+  .station-status.live { color:var(--green); border:1px solid var(--green); }
+  .station-status.review { color:var(--gold); border:1px solid var(--gold); }
+  .station-status.building { color:var(--cyan); border:1px solid var(--cyan); }
+  .station-name { font-size:10px; color:var(--text); margin-bottom:6px; letter-spacing:1px; }
+  .station-mission { font-size:10px; color:var(--text); opacity:0.7; line-height:1.5; margin-bottom:8px; }
+  .station-metrics { display:flex; gap:16px; }
+  .station-metric { font-size:10px; }
+  .station-metric span { display:block; color:var(--text); font-size:9px; }
+  .station-metric strong { color:var(--green); }
+  .station-metric.gold strong { color:var(--gold); }
+  .station-metric.red strong { color:var(--red); }
+
+  /* Right panel */
+  .right-panel { padding: 20px 24px; overflow-y: auto; }
+
+  /* Command grid */
+  .cmd-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-bottom:24px; }
+  
+  .cmd-card {
+    background: var(--surface);
+    border: 1px solid var(--green-dim);
+    padding: 16px 20px;
+    position: relative; overflow:hidden;
+  }
+  .cmd-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+  }
+  .cmd-card.gold::before { background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+  .cmd-card.cyan::before { background: linear-gradient(90deg, transparent, var(--cyan), transparent); }
+  .cmd-card.red::before { background: linear-gradient(90deg, transparent, var(--red), transparent); }
+
+  .cmd-label { font-size:9px; color:var(--text); letter-spacing:3px; margin-bottom:6px; }
+  .cmd-value { font-family:'Orbitron',monospace; font-size:24px; color:var(--green); font-weight:700; }
+  .cmd-card.gold .cmd-value { color:var(--gold); }
+  .cmd-card.cyan .cmd-value { color:var(--cyan); }
+  .cmd-card.red .cmd-value { color:var(--red); }
+  .cmd-sub { font-size:9px; color:var(--text); margin-top:4px; }
+
+  /* Section headers */
+  .section-header {
+    font-family:'Orbitron',monospace; font-size:10px; letter-spacing:4px;
+    color:var(--gold); margin-bottom:14px; display:flex; align-items:center; gap:12px;
+  }
+  .section-header::after { content:''; flex:1; height:1px; background:var(--green-dim); }
+
+  /* Intel feed */
+  .intel-feed { background:var(--surface); border:1px solid var(--green-dim); padding:16px; margin-bottom:24px; }
+  .intel-line { font-size:11px; padding:5px 0; border-bottom:1px solid rgba(0,255,136,0.05); display:flex; gap:12px; }
+  .intel-line:last-child { border-bottom:none; }
+  .intel-time { color:var(--text); min-width:70px; font-size:10px; }
+  .intel-tag { font-size:9px; padding:1px 8px; border-radius:2px; min-width:80px; text-align:center; }
+  .intel-tag.trade { color:var(--green); border:1px solid var(--green); }
+  .intel-tag.deploy { color:var(--cyan); border:1px solid var(--cyan); }
+  .intel-tag.review { color:var(--gold); border:1px solid var(--gold); }
+  .intel-tag.booking { color:#ff88ff; border:1px solid #ff88ff; }
+  .intel-msg { color:var(--text); flex:1; }
+
+  /* Active operations table */
+  .ops-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .ops-table th { color:var(--gold); font-family:'Orbitron',monospace; font-size:9px; letter-spacing:2px; padding:8px 12px; text-align:left; border-bottom:1px solid var(--green-dim); }
+  .ops-table td { padding:8px 12px; border-bottom:1px solid rgba(0,255,136,0.05); color:var(--text); }
+  .ops-table tr:hover td { background:rgba(0,255,136,0.03); }
+  .ops-table .val { color:var(--green); font-weight:bold; }
+  .ops-table .val.gold { color:var(--gold); }
+  .ops-table .val.cyan { color:var(--cyan); }
+  .ops-table .badge { font-size:9px; padding:2px 8px; border-radius:2px; letter-spacing:1px; }
+  .badge-live { color:var(--green); border:1px solid var(--green); }
+  .badge-review { color:var(--gold); border:1px solid var(--gold); }
+  .badge-active { color:var(--cyan); border:1px solid var(--cyan); }
+
+  /* Isometric decorative element */
+  .iso-widget {
+    background: var(--surface);
+    border: 1px solid var(--green-dim);
+    padding: 16px;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .iso-svg { width:100%; max-width:400px; height:200px; }
+
+  /* Footer */
+  .footer {
+    background: var(--surface); border-top:1px solid var(--green-dim);
+    padding:8px 32px; display:flex; justify-content:space-between;
+    font-size:10px; color:var(--text); letter-spacing:1px;
+    position:fixed; bottom:0; left:0; right:0;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--green-dim); border-radius:2px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--green); }
+
+  /* Glitch animation */
+  @keyframes glitch {
+    0%,100% { transform:none; }
+    92% { transform:skewX(0.5deg) translateX(1px); }
+    94% { transform:skewX(-0.5deg) translateX(-1px); }
+    96% { transform:none; }
+  }
+  .header-logo { animation: glitch 8s infinite; }
+</style>
+</head>
+<body>
+
+<!-- Corner decorations -->
+<div class="corner tl"></div>
+<div class="corner tr"></div>
+<div class="corner bl"></div>
+<div class="corner br"></div>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">TEN/18</div>
+    <div class="header-sub">ENTERPRISE LLC // DANARIO EDGAR II</div>
+  </div>
+  <div class="header-center">
+    <div class="header-title">◈ COMMAND CENTER ◈</div>
+  </div>
+  <div class="header-right">
+    <div class="clock" id="clock">--:--:--</div>
+    <div style="font-size:10px;margin-top:2px;">HOUSTON, TX // UTC-5</div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <span><span class="status-dot green"></span>SYSTEMS NOMINAL</span>
+  <span><span class="status-dot green"></span>BEATMATCH: ONLINE</span>
+  <span><span class="status-dot green"></span>INTELLITRADE: SCANNING</span>
+  <span><span class="status-dot gold"></span>MIX-MATCH: IN REVIEW</span>
+  <span><span class="status-dot green"></span>COOLXDAD: LIVE</span>
+  <span><span class="status-dot gold"></span>TEN/18 APPAREL: ACTIVE</span>
+  <span><span class="status-dot green"></span>AGENTS: 9 REGISTERED</span>
+</div>
+
+<!-- Main -->
+<div class="main">
+  
+  <!-- Left panel - Station roster -->
+  <div class="left-panel">
+    <div class="panel-title">◈ ACTIVE STATIONS // 6 DEPLOYED</div>
+
+    <div class="station-card active" onclick="selectStation('beatmatch')">
+      <div class="station-header">
+        <div class="station-codename">// BEATMATCH</div>
+        <span class="station-status live">● LIVE</span>
+      </div>
+      <div class="station-name">DJ BOOKING MARKETPLACE // TRACK A</div>
+      <div class="station-mission">Connect DJs to venues. Stripe Connect payouts. Digital contracts. Mix Store.</div>
+      <div class="station-metrics">
+        <div class="station-metric"><strong>9</strong><span>AGENTS</span></div>
+        <div class="station-metric"><strong>2</strong><span>BOOKINGS</span></div>
+        <div class="station-metric gold"><strong>$687</strong><span>REVENUE</span></div>
+      </div>
+    </div>
+
+    <div class="station-card" onclick="selectStation('intellitrade')">
+      <div class="station-header">
+        <div class="station-codename">// INTELLITRADE AI</div>
+        <span class="station-status live">● LIVE</span>
+      </div>
+      <div class="station-name">ALGORITHMIC TRADING // IEEE 2026</div>
+      <div class="station-mission">259 assets. Tri-signal fusion. FinBERT + LSTM + TCN. Paper trading active.</div>
+      <div class="station-metrics">
+        <div class="station-metric gold"><strong>$10,215</strong><span>BALANCE</span></div>
+        <div class="station-metric"><strong>71.1%</strong><span>WIN RATE</span></div>
+        <div class="station-metric"><strong>491</strong><span>TRADES</span></div>
+      </div>
+    </div>
+
+    <div class="station-card alert" onclick="selectStation('mixmatch')">
+      <div class="station-header">
+        <div class="station-codename">// MIX-MATCH</div>
+        <span class="station-status review">◈ REVIEW</span>
+      </div>
+      <div class="station-name">IOS DJ BOOKING APP // BUILD 16</div>
+      <div class="station-mission">React Native. Expo. Bearer token auth. Subscriptions: $29/$79/$149. In Apple review.</div>
+      <div class="station-metrics">
+        <div class="station-metric"><strong>16</strong><span>BUILD</span></div>
+        <div class="station-metric"><strong>1.0.1</strong><span>VERSION</span></div>
+        <div class="station-metric gold"><strong>PENDING</strong><span>STATUS</span></div>
+      </div>
+    </div>
+
+    <div class="station-card" onclick="selectStation('coolxdad')">
+      <div class="station-header">
+        <div class="station-codename">// COOLXDAD</div>
+        <span class="station-status live">● LIVE</span>
+      </div>
+      <div class="station-name">COMMUNITY iOS APP // BUILD 38</div>
+      <div class="station-mission">Fatherhood community. CoolxFamily IAP $6.99/mo. KXN. CoolxFlix. One Dream Shop.</div>
+      <div class="station-metrics">
+        <div class="station-metric"><strong>1.4.0</strong><span>VERSION</span></div>
+        <div class="station-metric"><strong>APP STORE</strong><span>LIVE</span></div>
+        <div class="station-metric gold"><strong>ACTIVE</strong><span>STATUS</span></div>
+      </div>
+    </div>
+
+    <div class="station-card" onclick="selectStation('apparel')">
+      <div class="station-header">
+        <div class="station-codename">// TEN/18 APPAREL</div>
+        <span class="station-status live">● LIVE</span>
+      </div>
+      <div class="station-name">E-COMMERCE // SHOPIFY × RAILWAY</div>
+      <div class="station-mission">14 products. Shopify integration. Gemini AI Stylist. Railway deployed.</div>
+      <div class="station-metrics">
+        <div class="station-metric"><strong>14</strong><span>PRODUCTS</span></div>
+        <div class="station-metric"><strong>SHOPIFY</strong><span>BACKEND</span></div>
+        <div class="station-metric gold"><strong>ACTIVE</strong><span>STATUS</span></div>
+      </div>
+    </div>
+
+    <div class="station-card" onclick="selectStation('ariels')">
+      <div class="station-header">
+        <div class="station-codename">// ARIELS W.O.D.</div>
+        <span class="station-status building">◌ BUILDING</span>
+      </div>
+      <div class="station-name">DANCE STUDIO MANAGEMENT // SaaS</div>
+      <div class="station-mission">Studio management platform. Stripe billing. Railway deployed. Awaiting Ariel's keys.</div>
+      <div class="station-metrics">
+        <div class="station-metric"><strong>RAILWAY</strong><span>HOST</span></div>
+        <div class="station-metric"><strong>STRIPE</strong><span>BILLING</span></div>
+        <div class="station-metric gold"><strong>STANDBY</strong><span>STATUS</span></div>
+      </div>
+    </div>
+
+    <!-- DJ Identity -->
+    <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--green-dim);">
+      <div class="panel-title">◈ OPERATOR IDENTITY</div>
+      <div class="station-card">
+        <div class="station-codename" style="margin-bottom:6px;">// DJ 2X</div>
+        <div class="station-name">DANARIO EDGAR II // Ten/18 Enterprise</div>
+        <div class="station-mission">M.S. CS PVAMU 2026 · IEEE Published · Founder · Active DJ</div>
+        <div class="station-metrics" style="margin-top:8px;">
+          <div class="station-metric"><strong>$9,374</strong><span>MAY REVENUE</span></div>
+          <div class="station-metric"><strong>6</strong><span>PRODUCTS</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel - Command feed -->
+  <div class="right-panel" style="padding-bottom:60px;">
+
+    <!-- Top metrics -->
+    <div class="cmd-grid" style="margin-top:4px;">
+      <div class="cmd-card gold">
+        <div class="cmd-label">ENTERPRISE REVENUE // MAY 2026</div>
+        <div class="cmd-value">$9,374</div>
+        <div class="cmd-sub">Chase Business Checking // TEN/18 BRANDS LLC</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-label">INTELLITRADE BALANCE</div>
+        <div class="cmd-value">$10,215</div>
+        <div class="cmd-sub">+$215.66 total · 71.1% win rate · 491 trades</div>
+      </div>
+      <div class="cmd-card cyan">
+        <div class="cmd-label">ACTIVE DEPLOYMENTS</div>
+        <div class="cmd-value">4 LIVE</div>
+        <div class="cmd-sub">Beatmatch · CoolxDad · IntelliTrade · Apparel</div>
+      </div>
+      <div class="cmd-card">
+        <div class="cmd-label">REGISTERED USERS</div>
+        <div class="cmd-value">9</div>
+        <div class="cmd-sub">7 DJs · 2 Venues · All onboarded</div>
+      </div>
+      <div class="cmd-card gold">
+        <div class="cmd-label">PENDING APPROVALS</div>
+        <div class="cmd-value">2</div>
+        <div class="cmd-sub">Mix-Match (B16) · CoolxDad (1.4.0) // Apple Review</div>
+      </div>
+      <div class="cmd-card cyan">
+        <div class="cmd-label">TYSON ACCOUNT</div>
+        <div class="cmd-value">$200</div>
+        <div class="cmd-sub">tysonmorris25@gmail.com · Extreme tier · Paper</div>
+      </div>
+    </div>
+
+    <!-- Intel feed -->
+    <div class="section-header">◈ RECENT INTEL // ACTIVITY LOG</div>
+    <div class="intel-feed">
+      <div class="intel-line">
+        <span class="intel-time">06/16 19:03</span>
+        <span class="intel-tag deploy">DEPLOY</span>
+        <span class="intel-msg">Mix-Match build 16 (v1.0.1) submitted to Apple App Store Connect</span>
+      </div>
+      <div class="intel-line">
+        <span class="intel-time">06/16 18:29</span>
+        <span class="intel-tag review">FINANCE</span>
+        <span class="intel-msg">June 2026 bank statement merged — Chase Business (TEN/18 BRANDS LLC)</span>
+      </div>
+      <div class="intel-line">
+        <span class="intel-time">06/16 15:23</span>
+        <span class="intel-tag booking">TRADING</span>
+        <span class="intel-msg">Tyson Morris account created — $200 Extreme tier paper session active</span>
+      </div>
+      <div class="intel-line">
+        <span class="intel-time">06/16 14:46</span>
+        <span class="intel-tag deploy">AI OPS</span>
+        <span class="intel-msg">Options overhaul deployed — 21-45 DTE, IV rank gate, delta 0.30-0.45</span>
+      </div>
+      <div class="intel-line">
+        <span class="intel-time">06/16 14:38</span>
+        <span class="intel-tag review">TRADING</span>
+        <span class="intel-msg">Options disabled — max 5 trades/day enforced — 82% confidence threshold active</span>
+      </div>
+      <div class="intel-line">
+        <span class="intel-time">06/16 13:12</span>
+        <span class="intel-tag booking">BEATMATCH</span>
+        <span class="intel-msg">atr_at_entry NoneType crash fixed — trade feed loading restored</span>
+      </div>
+      <div class="intel-line">
+        <span class="intel-time">06/10 21:30</span>
+        <span class="intel-tag deploy">COOLXDAD</span>
+        <span class="intel-msg">CoolxDad v1.4.0 build 38 — real shop products, COOLXFLIX tab, COOLXDAD branding</span>
+      </div>
+      <div class="intel-line">
+        <span class="intel-time">06/10 20:55</span>
+        <span class="intel-tag booking">BEATMATCH</span>
+        <span class="intel-msg">Brittany Cowan — $375.50 balance payment received — DFW5 Spring Fling complete</span>
+      </div>
+    </div>
+
+    <!-- Active operations -->
+    <div class="section-header">◈ ACTIVE OPERATIONS // ALL STATIONS</div>
+    <div style="background:var(--surface); border:1px solid var(--green-dim); margin-bottom:24px;">
+      <table class="ops-table">
+        <thead>
+          <tr>
+            <th>STATION</th>
+            <th>MISSION TYPE</th>
+            <th>CURRENT OP</th>
+            <th>METRIC</th>
+            <th>STATUS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--cyan);">BEATMATCH</td>
+            <td>DJ MARKETPLACE</td>
+            <td>Mix upload (Tymon), pay-balance flow, email automation</td>
+            <td class="val gold">$687 revenue</td>
+            <td><span class="badge badge-live">LIVE</span></td>
+          </tr>
+          <tr>
+            <td style="color:var(--cyan);">INTELLITRADE</td>
+            <td>ALGO TRADING</td>
+            <td>Scanner running · Options overhaul deployed · Tyson session active</td>
+            <td class="val">71.1% WR</td>
+            <td><span class="badge badge-live">SCANNING</span></td>
+          </tr>
+          <tr>
+            <td style="color:var(--gold);">MIX-MATCH</td>
+            <td>iOS BOOKING APP</td>
+            <td>Build 16 submitted — bearer auth, support URL, EULA link</td>
+            <td class="val gold">Build 16</td>
+            <td><span class="badge badge-review">IN REVIEW</span></td>
+          </tr>
+          <tr>
+            <td style="color:var(--gold);">COOLXDAD</td>
+            <td>COMMUNITY APP</td>
+            <td>v1.4.0 submitted — real shop, COOLXFLIX, all-caps branding</td>
+            <td class="val gold">v1.4.0</td>
+            <td><span class="badge badge-review">IN REVIEW</span></td>
+          </tr>
+          <tr>
+            <td style="color:var(--cyan);">TEN/18 APPAREL</td>
+            <td>E-COMMERCE</td>
+            <td>Shopify live · 14 products · Gemini AI Stylist active</td>
+            <td class="val">14 products</td>
+            <td><span class="badge badge-live">LIVE</span></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">ARIELS W.O.D.</td>
+            <td>STUDIO SaaS</td>
+            <td>Awaiting Ariel's Stripe keys for full deployment</td>
+            <td class="val cyan">STANDBY</td>
+            <td><span class="badge badge-active">STANDBY</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Isometric decoration with live stats -->
+    <div class="section-header">◈ ENTERPRISE CONSTELLATION MAP</div>
+    <div class="iso-widget">
+      <svg class="iso-svg" viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Grid lines -->
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#0a2040" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="600" height="200" fill="url(#grid)"/>
+        
+        <!-- Nodes -->
+        <circle cx="100" cy="100" r="30" fill="none" stroke="#00ff88" stroke-width="1.5"/>
+        <circle cx="100" cy="100" r="20" fill="rgba(0,255,136,0.05)" stroke="#00ff88" stroke-width="0.5"/>
+        <text x="100" y="95" text-anchor="middle" fill="#00ff88" font-family="monospace" font-size="9">BEATMATCH</text>
+        <text x="100" y="107" text-anchor="middle" fill="#C9A03C" font-family="monospace" font-size="10">●</text>
+        
+        <circle cx="220" cy="60" r="30" fill="none" stroke="#C9A03C" stroke-width="1.5"/>
+        <circle cx="220" cy="60" r="20" fill="rgba(201,160,60,0.05)" stroke="#C9A03C" stroke-width="0.5"/>
+        <text x="220" y="55" text-anchor="middle" fill="#C9A03C" font-family="monospace" font-size="8">INTELLITRADE</text>
+        <text x="220" y="67" text-anchor="middle" fill="#00ff88" font-family="monospace" font-size="10">◈</text>
+
+        <circle cx="340" cy="120" r="25" fill="none" stroke="#00ffff" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <text x="340" y="115" text-anchor="middle" fill="#00ffff" font-family="monospace" font-size="8">MIX-MATCH</text>
+        <text x="340" y="128" text-anchor="middle" fill="#C9A03C" font-family="monospace" font-size="9">◌</text>
+
+        <circle cx="450" cy="70" r="25" fill="none" stroke="#00ff88" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <text x="450" y="65" text-anchor="middle" fill="#00ff88" font-family="monospace" font-size="8">COOLXDAD</text>
+        <text x="450" y="78" text-anchor="middle" fill="#C9A03C" font-family="monospace" font-size="9">◌</text>
+
+        <circle cx="530" cy="140" r="20" fill="none" stroke="#00ff88" stroke-width="1"/>
+        <text x="530" y="135" text-anchor="middle" fill="#00ff88" font-family="monospace" font-size="7">APPAREL</text>
+        <text x="530" y="147" text-anchor="middle" fill="#00ff88" font-family="monospace" font-size="9">●</text>
+
+        <!-- Connection lines -->
+        <line x1="130" y1="100" x2="190" y2="70" stroke="#00ff88" stroke-width="0.5" opacity="0.4"/>
+        <line x1="220" y1="90" x2="315" y2="115" stroke="#C9A03C" stroke-width="0.5" opacity="0.4"/>
+        <line x1="365" y1="110" x2="425" y2="80" stroke="#00ffff" stroke-width="0.5" opacity="0.4"/>
+        <line x1="475" y1="80" x2="510" y2="130" stroke="#00ff88" stroke-width="0.5" opacity="0.4"/>
+        
+        <!-- Center label -->
+        <text x="300" y="185" text-anchor="middle" fill="#C9A03C" font-family="Orbitron,monospace" font-size="10" letter-spacing="4">TEN/18 ENTERPRISE CONSTELLATION</text>
+      </svg>
+    </div>
+
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <span>TEN/18 ENTERPRISE LLC // HOUSTON, TX</span>
+  <span id="footer-time">INITIALIZING...</span>
+  <span>DANARIO EDGAR II // CEO // FOUNDER</span>
+</div>
+
+<script>
+// Clock
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2,'0');
+  const m = now.getMinutes().toString().padStart(2,'0');
+  const s = now.getSeconds().toString().padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+  
+  const dateStr = now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('footer-time').textContent = `${dateStr} // ${h}:${m}:${s} CDT`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Station select
+function selectStation(id) {
+  document.querySelectorAll('.station-card').forEach(c => c.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+</script>
+
+</body>
+</html>
